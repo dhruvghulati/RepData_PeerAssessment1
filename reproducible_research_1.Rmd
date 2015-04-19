@@ -1,0 +1,121 @@
+---
+title: "Reproducible Research 1"
+output: html_document
+---
+For this assignment, I need to read in a CSV from the Fitbit activity data.
+
+##Loading and preprocessing the data
+
+First I need certain libraries:
+
+```{r Libraries, cache=TRUE}
+library("plyr")
+library("ggplot2")
+library("lattice")
+```
+
+```{r Reading Data, cache=TRUE}
+setwd("~/Documents/datasciencecoursera")
+activity<-read.csv("activity.csv")
+summary(activity)
+```
+##What is mean total number of steps taken per day?
+
+To calculate the total number of steps per day, I need to combine all the values for 5 minute intervals (0-2355), and then sum each value for steps for each interval, for each day. For this I will use ```ddply```.
+
+```{r Summary of Total Steps with NA, cache=TRUE}
+activity<-na.omit(activity)
+data<-ddply(activity, .(date), summarize, totalsteps = sum(steps, na.rm = TRUE))
+```
+
+Now I make a histogram.
+
+```{r Histogram with NA, cache=TRUE}
+hist(data$totalsteps,main="Histogram of Step Frequencies", xlab="Steps", ylab="Frequency of Occurrence",ylim = c(0, 40))
+```
+
+Finally, I summarise the mean and median below and print it:
+
+
+```{r Summary of Total Steps, cache=TRUE }
+mean(data$totalsteps)
+median(data$totalsteps)
+```
+
+##What is the average daily activity pattern?
+
+*Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)*
+
+```{r Average daily pattern with NA, cache=TRUE }
+averagesteps <- ddply(activity, c("interval"), summarise,
+               averagesteps = mean(steps)
+)
+
+plot(averagesteps$interval, averagesteps$averagesteps, type="l", xlab= "5 minute interval", ylab= "Average Steps Taken", col="green" , lwd=2)
+
+```
+
+*Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?*
+
+```{r Interval with Max Steps, cache=TRUE}
+which.max(averagesteps$averagesteps)
+```
+
+##Imputing missing values
+
+*Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)*
+
+```{r Number of NA Values, cache=TRUE}
+activity<-read.csv("activity.csv")
+sum(is.na(activity))
+```
+
+Where steps are NA, I split the data frame by interval, and for that interval across all dates, I then take the median steps. We can see that the median and third quartile change compared to the first dataset. 
+
+```{r Replace NA Values, cache=TRUE}
+activity <- ddply(activity,.(interval), transform, 
+                       steps=ifelse(is.na(steps), median(steps, na.rm=TRUE), steps))
+summary(activity)
+```
+
+Here I create a new dataset for the total steps per day, now that we have no missing values.
+
+```{r New Dataset without NA of total steps, cache=TRUE }
+data<-ddply(activity, .(date,interval), summarize, steps = sum(steps))
+summary(data)
+```
+
+Now I make a histogram.
+
+```{r Histogram without NA, cache=TRUE}
+hist(data$steps,main="Histogram of Step Frequencies (with NA values filled in)", xlab="Steps", ylab="Frequency of Occurrence",ylim = c(0, 5000),xlim = c(0, 900))
+```
+
+Now I report the mean and median total number of steps per day.
+
+```{r Mean and Median without NA, cache=TRUE}
+mean(data$steps)
+median(data$steps)
+```
+
+As we can see, the effect of replacing NA values with a number (the median of steps across all intervals, split by date) lowers the overall mean and median of total steps per day. This means that before, ignoring NA values actually meant that the data points were higher on aggregate, though less. Now you have more data points but on aggregate the mean total number of steps per day has gone down. Our histogram is also less neat (there are more occurrences of lower step frequencies than higher). This is because you have filled in the lower tail with a value instead of ignoring.
+
+##Are there differences in activity patterns between weekdays and weekends?
+
+*Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.*
+
+```{r Weekend Variable Creation, cache=TRUE}
+data$day <- weekdays(as.Date(data$date))
+data$weekend<-ifelse(!weekdays(as.Date(data$date)) %in% c('Saturday','Sunday'),data$weekend<-"Weekday", data$weekend<-"Weekend")
+head(data)
+```
+
+*Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).*
+
+```{r Panel Plot of Weekend Steps, cache=TRUE}
+averagesteps <- ddply(data, c("weekend","interval"), summarise,averagesteps = mean(steps))
+head(averagesteps)
+par(mfrow=c(2,1)) 
+plot <- xyplot(averagesteps ~ interval | weekend, xlab = "interval",data=averagesteps, type = "l",main = "Average Steps by Interval",layout=c(1,2))
+print(plot)
+```
